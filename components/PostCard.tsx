@@ -16,52 +16,44 @@ interface Post {
   officialResponse: boolean
 }
 
-interface PostCardProps {
+type PostCardProps = {
   post: Post
   onVote: (postId: number, voteType: "up" | "down") => void
+  error?: string
+  voting?: boolean
+  onDismissError?: () => void
 }
 
-export default function PostCard({ post, onVote }: PostCardProps) {
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
+export default function PostCard({ post, onVote, error, voting }: PostCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex gap-4">
-        {/* Vote Column */}
         <div className="flex flex-col items-center space-y-2 min-w-[60px]">
           <button
             onClick={() => onVote(post.id, "up")}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            disabled={!!voting}
+            className={`p-2 rounded-full transition-colors ${voting ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100"}`}
             aria-label="Votar positivo"
           >
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
             </svg>
           </button>
 
-          <span className="text-lg font-semibold text-textDark">{post.votes}</span>
+          <span className="text-xl font-semibold text-textDark">{post.votes}</span>
 
           <button
             onClick={() => onVote(post.id, "down")}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            disabled={!!voting}
+            className={`p-2 rounded-full transition-colors ${voting ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100"}`}
             aria-label="Votar negativo"
           >
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1">
           <div className="flex items-start justify-between mb-3">
             <Link href={`/post/${post.id}`} className="flex-1">
@@ -88,27 +80,14 @@ export default function PostCard({ post, onVote }: PostCardProps) {
             ))}
           </div>
 
-          {/* Meta Info */}
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <div className="flex items-center space-x-4">
-              <span>Por: {post.isAnonymous ? "Anônimo" : post.author}</span>
-              <span>{formatDate(post.createdAt)}</span>
+          {error && (
+            <div className="mt-4 rounded-md border border-red-200 bg-red-50 text-red-700 text-sm px-3 py-2">
+              {error}
             </div>
-
-            <div className="flex items-center space-x-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                />
-              </svg>
-              <span>{post.commentCount} comentários</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
+

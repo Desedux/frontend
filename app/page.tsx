@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import {useEffect, useMemo, useState} from "react"
 import Header from "@/components/Header"
 import PostCard from "@/components/PostCard"
-import type { Post } from "@/lib/types"
-import { getCards } from "@/lib/api/cards"
-import { mapCardToPostVM } from "@/lib/mappers"
+import type {Post} from "@/lib/types"
+import {getCards, voteCard} from "@/lib/api/cards"
+import {mapCardToPostVM} from "@/lib/mappers"
 
 type FilterType = "relevant" | "recent" | "answered"
 
@@ -16,9 +16,12 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(true)
+  const [votingIds, setVotingIds] = useState<Set<number>>(new Set())
+  const [voteErrors, setVoteErrors] = useState<Record<number, string>>({})
 
   useEffect(() => {
     let cancelled = false
+
     async function load() {
       setLoading(true)
       setError(null)
@@ -41,35 +44,51 @@ export default function HomePage() {
         if (!cancelled) setLoading(false)
       }
     }
+
     void load()
     return () => {
       cancelled = true
     }
   }, [page])
 
-  const handleVote = (postId: number, voteType: "up" | "down") => {
-    // otimista
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
-          ? { ...post, votes: voteType === "up" ? post.votes + 1 : post.votes - 1 }
-          : post,
-      ),
+  function clearVoteError(postId: number) {
+    setVoteErrors(prev => {
+      const {[postId]: _, ...rest} = prev
+      return rest
+    })
+  }
+
+  async function handleVote(postId: number, voteType: "up" | "down") {
+    if (votingIds.has(postId)) return
+    const isUpvote = voteType === "up"
+
+    setVotingIds(prev => new Set(prev).add(postId))
+
+    setPosts(prev =>
+      prev.map(p => (p.id === postId ? {...p, votes: isUpvote ? p.votes + 1 : p.votes - 1} : p)),
     )
 
-    import("@/lib/api/cards")
-      .then(({ voteCard }) => voteCard(String(postId), voteType === "up"))
-      .catch((err) => {
-        console.error(err)
-        // rollback
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === postId
-              ? { ...post, votes: voteType === "up" ? post.votes - 1 : post.votes + 1 }
-              : post,
-          ),
-        )
+    try {
+      await voteCard(String(postId), isUpvote)
+      clearVoteError(postId)
+    } catch (err: any) {
+      const message =
+        err.message.includes('Forbidden resource')
+          ? "Você precisa estar logado para votar."
+          : "Não foi possível registrar seu voto. Tente novamente."
+      setVoteErrors(prev => ({...prev, [postId]: message}))
+
+      setPosts(prev =>
+        prev.map(p => (p.id === postId ? {...p, votes: isUpvote ? p.votes - 1 : p.votes + 1} : p)),
+      )
+      setTimeout(() => clearVoteError(postId), 3000)
+    } finally {
+      setVotingIds(prev => {
+        const next = new Set(prev)
+        next.delete(postId)
+        return next
       })
+    }
   }
 
   const filteredPosts = useMemo(() => {
@@ -86,16 +105,14 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-bgLight">
-      <Header />
+      <Header/>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {/* Page Title */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-textDark mb-2">Perguntas da Comunidade</h1>
           <p className="text-gray-600">Participe das discussões e acompanhe as respostas oficiais</p>
         </div>
 
-        {/* Filters */}
         <div className="mb-8">
           <div className="flex flex-wrap gap-4 mb-6">
             <button
@@ -137,30 +154,34 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* Error state */}
         {error && (
           <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-red-700">
             {error}
           </div>
         )}
 
-        {/* Loading skeleton */}
         {loading && posts.length === 0 && (
           <div className="space-y-6">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="animate-pulse rounded-lg bg-white p-6 shadow-sm border border-gray-200">
-                <div className="h-4 w-3/4 bg-gray-200 rounded mb-3" />
-                <div className="h-4 w-1/2 bg-gray-200 rounded mb-5" />
-                <div className="h-24 w-full bg-gray-100 rounded" />
+                <div className="h-4 w-3/4 bg-gray-200 rounded mb-3"/>
+                <div className="h-4 w-1/2 bg-gray-200 rounded mb-5"/>
+                <div className="h-24 w-full bg-gray-100 rounded"/>
               </div>
             ))}
           </div>
         )}
 
-        {/* Posts Feed */}
         <div className="space-y-6">
           {filteredPosts.map((post) => (
-            <PostCard key={post.id} post={post} onVote={handleVote} />
+            <PostCard
+              key={post.id}
+              post={post}
+              onVote={handleVote}
+              error={voteErrors[post.id]}
+              voting={votingIds.has(post.id)}
+              onDismissError={() => clearVoteError(post.id)}
+            />
           ))}
         </div>
 
