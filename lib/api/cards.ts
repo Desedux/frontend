@@ -17,10 +17,10 @@ export async function createCard(dto: CreateCardDto): Promise<any> {
   return http<any>(`/card`, { method: 'POST', body: dto });
 }
 
-export async function voteCard(id: string, isUpvote: boolean): Promise<void> {
-  return http<void>(`/card/${id}`, {
+export async function voteCard(id: string, vote: boolean): Promise<void> {
+  return http<void>(`/card`, {
     method: 'PATCH',
-    body: { isUpvote } as VoteDto,
+    body: { isUpvote: vote, cardId: id },
   });
 }
 

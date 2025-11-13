@@ -13,7 +13,7 @@ interface Comment {
 
 interface OfficialResponseCommentProps {
   comment: Comment
-  onVote: (commentId: number, voteType: "up" | "down") => void
+  onVote: (commentId: number, voteType: boolean) => void
 }
 
 export default function OfficialResponseComment({ comment, onVote }: OfficialResponseCommentProps) {

@@ -16,7 +16,7 @@ interface Comment {
 
 interface CommentThreadProps {
   comment: Comment
-  onVote: (commentId: number, voteType: "up" | "down") => void
+  onVote: (commentId: number, voteType: boolean) => void
   onReply: (parentId: number, replyContent: string) => void
   level?: number
 }
@@ -45,7 +45,10 @@ export default function CommentThread({ comment, onVote, onReply, level = 0 }: C
     setIsReplying(false)
   }
 
-  const marginLeft = level * 40
+  // recuo: base + por nível
+  const BASE_INDENT = 12 // px
+  const INDENT_PER_LEVEL = 40 // px
+  const marginLeft = BASE_INDENT + (level ?? 0) * INDENT_PER_LEVEL
 
   return (
     <div style={{ marginLeft: `${marginLeft}px` }} className="relative">
@@ -53,7 +56,7 @@ export default function CommentThread({ comment, onVote, onReply, level = 0 }: C
         <div className="flex gap-3">
           <div className="flex flex-col items-center space-y-1 min-w-[40px]">
             <button
-              onClick={() => onVote(comment.id, "up")}
+              onClick={() => onVote(comment.id, true)}
               className="p-1 rounded-full hover:bg-gray-100 transition-colors"
               aria-label="Votar positivo"
             >
@@ -65,7 +68,7 @@ export default function CommentThread({ comment, onVote, onReply, level = 0 }: C
             <span className="text-sm font-medium text-textDark">{comment.votes}</span>
 
             <button
-              onClick={() => onVote(comment.id, "down")}
+              onClick={() => onVote(comment.id, false)}
               className="p-1 rounded-full hover:bg-gray-100 transition-colors"
               aria-label="Votar negativo"
             >

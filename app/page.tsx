@@ -72,10 +72,17 @@ export default function HomePage() {
       await voteCard(String(postId), isUpvote)
       clearVoteError(postId)
     } catch (err: any) {
-      const message =
-        err.message.includes('Forbidden resource')
-          ? "Você precisa estar logado para votar."
-          : "Não foi possível registrar seu voto. Tente novamente."
+      console.error('Não foi possível registrar o voto:', err)
+      let message: string
+      const msg = err.message || ""
+      if (msg.includes("Vote already recorded")) {
+        message = `Você já deu ${voteType == 'up' ? "like" : "dislike"} nesse card.`
+      }else if (msg.includes("Forbidden resource")){
+        message = "Você precisa estar logado para votar."
+      } else {
+        message = "Não foi possível registrar seu voto. Tente novamente."
+      }
+
       setVoteErrors(prev => ({...prev, [postId]: message}))
 
       setPosts(prev =>

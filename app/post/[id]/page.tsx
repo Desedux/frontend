@@ -1,30 +1,34 @@
 "use client"
 
-import type React from "react"
-import { useEffect, useMemo, useState } from "react"
-import { useParams } from "next/navigation"
+import React, {useRef} from "react"
+import {useEffect, useState} from "react"
+import {useParams} from "next/navigation"
 import Header from "@/components/Header"
 import CommentThread from "@/components/CommentThread"
 import OfficialResponseComment from "@/components/OfficialResponseComment"
-import type { Post, Comment } from "@/lib/types"
-import { getCardById, voteCard } from "@/lib/api/cards"
-import { listComments, createComment, setReaction } from "@/lib/api/commentary"
-import type { CommentResponseDto } from "@/lib/api/types"
+import type {Post, Comment} from "@/lib/types"
+import {getCardById, voteCard} from "@/lib/api/cards"
+import {listComments, createComment, setReaction} from "@/lib/api/commentary"
+import type {CommentResponseDto} from "@/lib/api/types"
+import {openLoginModal} from "@/lib/ui";
 
 function mapComment(dto: CommentResponseDto): Comment {
   const votes =
     (dto as any).up_down != null
       ? (dto as any).up_down
-      : (dto.likesCount || 0) - (dto.dislikesCount || 0)
+      : (dto as any).likesCount || (dto as any).dislikesCount
+        ? ((dto as any).likesCount || 0) - ((dto as any).dislikesCount || 0)
+        : 0
+
   return {
     id: Number(dto.id),
     content: dto.content,
     author: dto.author,
     isAnonymous: false,
-    createdAt: dto.created_at,
+    createdAt: (dto as any).created_at,
     votes,
-    isOfficial: false,
-    replies: (dto.replies || []).map(mapComment),
+    isOfficial: Boolean((dto as any).is_official ?? (dto as any).isOfficial ?? false),
+    replies: [], // árvore montada depois
   }
 }
 
@@ -38,7 +42,7 @@ export default function PostDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadingComments, setLoadingComments] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [commentReactions, setCommentReactions] = useState<Record<number, "like" | "dislike" | "none">>({})
+  const [authWarning, setAuthWarning] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -69,43 +73,65 @@ export default function PostDetailPage() {
       }
     }
     void load()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [postId])
+
+  function buildCommentTree(rows: CommentResponseDto[]): Comment[] {
+    const nodes = new Map<number, Comment>()
+    rows.forEach((dto) => { nodes.set(Number(dto.id), mapComment(dto)) })
+
+    const roots: Comment[] = []
+    rows.forEach((dto) => {
+      const id = Number(dto.id)
+      const pidRaw = (dto as any).parent_id ?? (dto as any).parentId ?? null
+      const pid = pidRaw == null ? null : Number(pidRaw)
+      const node = nodes.get(id)!
+      if (pid == null) roots.push(node)
+      else {
+        const parent = nodes.get(pid)
+        if (parent) parent.replies.push(node)
+        else roots.push(node)
+      }
+    })
+
+    const sortByDate = (a: Comment, b: Comment) =>
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+
+    const sortRec = (arr: Comment[]) => {
+      arr.sort(sortByDate)
+      arr.forEach((c) => sortRec(c.replies))
+    }
+    sortRec(roots)
+    return roots
+  }
+
+  const cancelledRef = useRef(false)
+
+  async function loadComments() {
+    setLoadingComments(true)
+    try {
+      const resp = await listComments(postId, { page: 1, limit: 50 })
+      if (cancelledRef.current) return
+
+      const flat = (resp.data || []) as CommentResponseDto[]
+      const tree = buildCommentTree(flat)
+      setComments(tree)
+      setPost((p) => (p ? { ...p, commentCount: resp.total ?? flat.length } : p))
+    } catch {
+      setComments([])
+    } finally {
+      if (!cancelledRef.current) setLoadingComments(false)
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false
-    async function loadComments() {
-      setLoadingComments(true)
-      try {
-        const resp = await listComments(postId, { page: 1, limit: 50 })
-        if (cancelled) return
-        const data = resp.data || []
-        const mapped = data.map(mapComment)
-        setComments(mapped)
-        setCommentReactions(() => {
-          const map: Record<number, "like" | "dislike" | "none"> = {}
-          for (const c of data) {
-            const r = (c as any).myReaction as "like" | "dislike" | null | undefined
-            map[Number(c.id)] = r ?? "none"
-          }
-          return map
-        })
-        if (post) setPost((p) => (p ? { ...p, commentCount: resp.total || mapped.length } : p))
-      } catch (e) {
-        setComments([])
-      } finally {
-        if (!cancelled) setLoadingComments(false)
-      }
-    }
+    cancelledRef.current = false
     void loadComments()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelledRef.current = true }
   }, [postId])
 
-  const handleVote = (postIdNum: number, voteType: "up" | "down") => {
+  // Like do CARD mantido
+  const handleVote = async (postIdNum: number, voteType: "up" | "down") => {
     if (!post) return
     setPost((prev) =>
       prev ? { ...prev, votes: voteType === "up" ? prev.votes + 1 : prev.votes - 1 } : null,
@@ -133,41 +159,31 @@ export default function PostDetailPage() {
     })
   }
 
-  const handleCommentVote = (commentId: number, voteType: "up" | "down") => {
-    const prev = commentReactions[commentId] ?? "none"
-    const intended: "like" | "dislike" =
-      voteType === "up" ? "like" : "dislike"
-    const next: "like" | "dislike" | "none" =
-      prev === intended ? "none" : intended
-    let delta = 0
-    if (prev === "none" && next === "like") delta = +1
-    else if (prev === "none" && next === "dislike") delta = -1
-    else if (prev === "like" && next === "none") delta = -1
-    else if (prev === "dislike" && next === "none") delta = +1
-    else if (prev === "like" && next === "dislike") delta = -2
-    else if (prev === "dislike" && next === "like") delta = +2
+  const handleCommentVote = async (commentId: number, voteType: boolean) => {
+    setComments(prevList =>
+      updateCommentVotesTree(prevList, commentId, voteType ? 1 : -1),
+    )
 
-    setComments((prevList) => updateCommentVotesTree(prevList, commentId, delta))
-    setCommentReactions((m) => ({ ...m, [commentId]: next }))
+    try {
+      await setReaction(`${postId}`, `${commentId}`, voteType)
+    } catch (err: any) {
+      console.log("A mensagem de erro do voto do comentário é " + err.message)
+      const msg = err?.message || ""
 
-    setReaction(postId, commentId, next)
-      .then((res) => {
-        const serverDelta = res.up_down
-      })
-      .catch(() => {
-        setComments((prevList) => updateCommentVotesTree(prevList, commentId, -delta))
-        setCommentReactions((m) => ({ ...m, [commentId]: prev }))
-      })
+      if (msg.includes("Forbidden resource")) {
+        setAuthWarning("Você precisa estar logado para votar em comentários.")
+      }
+
+      setComments(prevList =>
+        updateCommentVotesTree(prevList, commentId, voteType ? -1 : 1),
+      )
+    }
   }
 
   function insertReply(items: Comment[], parentId: number, reply: Comment): Comment[] {
     return items.map((c) => {
-      if (c.id === parentId) {
-        return { ...c, replies: [...c.replies, reply] }
-      }
-      if (c.replies && c.replies.length) {
-        return { ...c, replies: insertReply(c.replies, parentId, reply) }
-      }
+      if (c.id === parentId) return { ...c, replies: [...c.replies, reply] }
+      if (c.replies?.length) return { ...c, replies: insertReply(c.replies, parentId, reply) }
       return c
     })
   }
@@ -175,40 +191,47 @@ export default function PostDetailPage() {
   const handleReply = async (parentId: number, replyContent: string) => {
     if (!replyContent.trim()) return
     try {
-      const created = await createComment(postId, { content: replyContent, parentId })
+      const created = await createComment(postId, {content: replyContent, parentId})
       const reply: Comment = mapComment(created)
       setComments((prev) => insertReply(prev, parentId, reply))
-      if (post) setPost((p) => (p ? { ...p, commentCount: p.commentCount + 1 } : p))
+      setPost((p) => (p ? {...p, commentCount: p.commentCount + 1} : p))
     } catch {}
   }
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newComment.trim()) return
+    setAuthWarning(null)
     try {
-      const created = await createComment(postId, { content: newComment, parentId: null })
+      const created = await createComment(postId, {content: newComment, parentId: null})
       const c: Comment = mapComment(created)
       setComments((prev) => [...prev, c])
       setNewComment("")
-      if (post) setPost((p) => (p ? { ...p, commentCount: p.commentCount + 1 } : p))
-    } catch {}
+      setPost((p) => (p ? {...p, commentCount: p.commentCount + 1} : p))
+    } catch (err: any) {
+      if (err?.message?.includes('Forbidden resource')) {
+        setAuthWarning("Para comentar, você precisa estar logado.")
+        return
+      }
+      setAuthWarning("Não foi possível publicar o comentário. Tente novamente.")
+    }
   }
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
     })
   }
+
+  const officialComments = comments.filter((c) => c.isOfficial)
+  const regularComments = comments.filter((c) => !c.isOfficial)
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-bgLight">
-        <Header />
+        <Header/>
         <main className="max-w-4xl mx-auto px-4 py-8">
           <div className="animate-pulse">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
@@ -226,7 +249,7 @@ export default function PostDetailPage() {
   if (error || !post) {
     return (
       <div className="min-h-screen bg-bgLight">
-        <Header />
+        <Header/>
         <main className="max-w-4xl mx-auto px-4 py-8">
           <div className="text-center py-12">
             <h1 className="text-2xl font-bold text-textDark mb-4">Pergunta não encontrada</h1>
@@ -238,22 +261,15 @@ export default function PostDetailPage() {
     )
   }
 
-  const officialComments = useMemo(
-    () => comments.filter((c) => c.isOfficial),
-    [comments],
-  )
-  const regularComments = useMemo(
-    () => comments.filter((c) => !c.isOfficial),
-    [comments],
-  )
 
   return (
     <div className="min-h-screen bg-bgLight">
-      <Header />
+      <Header/>
       <main className="max-w-4xl mx-auto px-4 py-8">
         <nav className="mb-6">
           <a href="/" className="text-wine hover:text-wine/80 transition-colors">← Voltar para perguntas</a>
         </nav>
+
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
           <div className="flex gap-4">
             <div className="flex flex-col items-center space-y-2 min-w-[60px]">
@@ -263,7 +279,7 @@ export default function PostDetailPage() {
                 aria-label="Votar positivo"
               >
                 <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7"/>
                 </svg>
               </button>
               <span className="text-xl font-semibold text-textDark">{post.votes}</span>
@@ -273,10 +289,11 @@ export default function PostDetailPage() {
                 aria-label="Votar negativo"
               >
                 <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
                 </svg>
               </button>
             </div>
+
             <div className="flex-1">
               <div className="flex items-start justify-between mb-4">
                 <h1 className="text-2xl font-bold text-textDark pr-4">{post.title}</h1>
@@ -286,7 +303,9 @@ export default function PostDetailPage() {
                   </span>
                 )}
               </div>
+
               <p className="text-gray-700 mb-6 leading-relaxed">{post.content}</p>
+
               <div className="flex flex-wrap gap-2 mb-6">
                 {post.tags.map((tag) => (
                   <span key={tag} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
@@ -294,6 +313,7 @@ export default function PostDetailPage() {
                   </span>
                 ))}
               </div>
+
               <div className="flex items-center justify-between text-sm text-gray-500 pt-4 border-t border-gray-200">
                 <div className="flex items-center space-x-4">
                   <span>Por: {post.isAnonymous ? "Anônimo" : post.author}</span>
@@ -307,6 +327,7 @@ export default function PostDetailPage() {
 
         <div className="space-y-6">
           <h2 className="text-xl font-semibold text-textDark">Comentários ({comments.length})</h2>
+
           {officialComments.map((comment) => (
             <OfficialResponseComment
               key={comment.id}
@@ -314,6 +335,7 @@ export default function PostDetailPage() {
               onVote={(id, dir) => handleCommentVote(id, dir)}
             />
           ))}
+
           {regularComments.map((comment) => (
             <CommentThread
               key={comment.id}
@@ -322,17 +344,28 @@ export default function PostDetailPage() {
               onReply={handleReply}
             />
           ))}
+
           {loadingComments && comments.length === 0 && (
             <div className="text-center py-8 text-gray-500">Carregando comentários...</div>
           )}
+
           {!loadingComments && comments.length === 0 && (
             <div className="text-center py-8">
               <p className="text-gray-500">Ainda não há comentários. Seja o primeiro a comentar!</p>
             </div>
           )}
+
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-medium text-textDark mb-4">Adicionar Comentário</h3>
             <form onSubmit={handleSubmitComment}>
+              {authWarning && (
+                <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-800">
+                  {authWarning}{" "}
+                  <button type="button" onClick={() => openLoginModal()} className="underline font-medium">
+                    Fazer login
+                  </button>
+                </div>
+              )}
               <textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}

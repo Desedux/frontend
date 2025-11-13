@@ -1,16 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import {useEffect, useState} from "react"
 import CreatePostModal from "./CreatePostModal"
 import UserLogin from "./UserLogin"
-import { useAuth } from "@/contexts/AuthContext"
+import {useAuth} from "@/contexts/AuthContext"
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
-  const { user, login, logout } = useAuth()
+  const {user, login, logout} = useAuth()
 
   const handleCreatePost = (postData: {
     title: string
@@ -21,6 +21,12 @@ export default function Header() {
     console.log("Nova pergunta criada:", postData)
     // In a real app, this would make an API call
   }
+
+  useEffect(() => {
+    const open = () => setIsLoginModalOpen(true)
+    window.addEventListener("open-login", open)
+    return () => window.removeEventListener("open-login", open)
+  }, [])
 
   const handleLogin = (credentials: { email: string; password: string }) => {
     login(credentials)
@@ -83,7 +89,7 @@ export default function Header() {
               {/* Mobile menu button */}
               <button className="md:hidden p-2" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menu">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/>
                 </svg>
               </button>
             </div>
@@ -115,7 +121,7 @@ export default function Header() {
         onSubmit={handleCreatePost}
       />
 
-      <UserLogin isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} onLogin={handleLogin} />
+      <UserLogin isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} onLogin={handleLogin}/>
     </>
   )
 }
