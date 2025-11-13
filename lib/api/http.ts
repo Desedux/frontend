@@ -1,10 +1,21 @@
-// lib/api/http.ts
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
 
 function getToken() {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('idToken'); // ou integrar com AuthContext
+  if (typeof window === "undefined") return null
+
+  const stored = localStorage.getItem("desedux_user")
+  if (!stored) return null
+
+  try {
+    const parsed = JSON.parse(stored) as {
+      tokens?: { idToken?: string }
+    }
+    return parsed.tokens?.idToken ?? null
+  } catch {
+    return null
+  }
 }
+
 
 type HttpOptions = {
   method?: 'GET'|'POST'|'PATCH'|'DELETE';

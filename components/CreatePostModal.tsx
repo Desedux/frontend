@@ -1,8 +1,9 @@
 "use client"
 
 import type React from "react"
-
+import {createCard} from "@/lib/api/cards"
 import { useState } from "react"
+import {getTags} from "@/lib/api/tags";
 
 interface CreatePostModalProps {
   isOpen: boolean
@@ -12,8 +13,36 @@ interface CreatePostModalProps {
     content: string
     category: string
     isAnonymous: boolean
-  }) => void
+  }) => Promise<void>
 }
+
+const handleCreatePost = async (postData: {
+  title: string
+  content: string
+  category: string
+  isAnonymous: boolean
+}) => {
+  let tags: { id: number; name: string }[] = []
+
+  try {
+    tags = await getTags()
+  } catch {
+    tags = []
+  }
+
+  const found = tags.find(t => t.name === postData.category)
+  const fallbackId = tags[0]?.id ?? 1
+  const tagId = found?.id ?? fallbackId
+
+  await createCard({
+    title: postData.title,
+    description: postData.content,
+    isAnonymous: postData.isAnonymous,
+    tags: [tagId],
+  })
+}
+
+
 
 export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalProps) {
   const [title, setTitle] = useState("")
@@ -34,24 +63,24 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
     "Outros",
   ]
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim() || !content.trim() || !category) return
 
-    onSubmit({
+    await onSubmit({
       title: title.trim(),
       content: content.trim(),
       category,
       isAnonymous,
     })
 
-    // Reset form
     setTitle("")
     setContent("")
     setCategory("")
     setIsAnonymous(false)
     onClose()
   }
+
 
   const handleClose = () => {
     setTitle("")

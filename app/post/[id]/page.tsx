@@ -43,6 +43,7 @@ export default function PostDetailPage() {
   const [loadingComments, setLoadingComments] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [authWarning, setAuthWarning] = useState<string | null>(null)
+  const [commentVoteErrors, setCommentVoteErrors] = useState<Record<number, string>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -94,6 +95,7 @@ export default function PostDetailPage() {
       }
     })
 
+
     const sortByDate = (a: Comment, b: Comment) =>
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
 
@@ -103,6 +105,13 @@ export default function PostDetailPage() {
     }
     sortRec(roots)
     return roots
+  }
+
+  function clearCommentVoteError(commentId: number) {
+    setCommentVoteErrors(prev => {
+      const { [commentId]: _, ...rest } = prev
+      return rest
+    })
   }
 
   const cancelledRef = useRef(false)
@@ -166,19 +175,31 @@ export default function PostDetailPage() {
 
     try {
       await setReaction(`${postId}`, `${commentId}`, voteType)
+      clearCommentVoteError(commentId)
     } catch (err: any) {
       console.log("A mensagem de erro do voto do comentário é " + err.message)
       const msg = err?.message || ""
 
-      if (msg.includes("Forbidden resource")) {
-        setAuthWarning("Você precisa estar logado para votar em comentários.")
+      let message: string
+      if (msg.includes("Vote already recorded")) {
+        message = `Você já deu ${voteType ? "like" : "dislike"} neste comentário.`
+      } else if (msg.includes("Forbidden resource") || msg.includes("Unauthorized")) {
+        message = "Você precisa estar logado para votar em comentários."
+      } else {
+        message = "Não foi possível registrar seu voto. Tente novamente."
       }
+
+      setCommentVoteErrors(prev => ({ ...prev, [commentId]: message }))
 
       setComments(prevList =>
         updateCommentVotesTree(prevList, commentId, voteType ? -1 : 1),
       )
+
+      setTimeout(() => clearCommentVoteError(commentId), 3000)
     }
+
   }
+
 
   function insertReply(items: Comment[], parentId: number, reply: Comment): Comment[] {
     return items.map((c) => {
@@ -333,6 +354,8 @@ export default function PostDetailPage() {
               key={comment.id}
               comment={comment}
               onVote={(id, dir) => handleCommentVote(id, dir)}
+              error={commentVoteErrors[comment.id]}
+              onDismissError={() => clearCommentVoteError(comment.id)}
             />
           ))}
 
@@ -342,6 +365,8 @@ export default function PostDetailPage() {
               comment={comment}
               onVote={(id, dir) => handleCommentVote(id, dir)}
               onReply={handleReply}
+              error={commentVoteErrors[comment.id]}
+              onDismissError={() => clearCommentVoteError(comment.id)}
             />
           ))}
 

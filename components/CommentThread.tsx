@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useAuth } from "@/contexts/AuthContext"
+import {useState} from "react"
+import {useAuth} from "@/contexts/AuthContext"
 
 interface Comment {
   id: number
@@ -16,15 +16,24 @@ interface Comment {
 
 interface CommentThreadProps {
   comment: Comment
-  onVote: (commentId: number, voteType: boolean) => void
-  onReply: (parentId: number, replyContent: string) => void
+  onVote: (commentId: number, voteType: boolean) => void | Promise<void>
+  onReply: (parentId: number, replyContent: string) => void | Promise<void>
   level?: number
+  error?: string
+  onDismissError?: () => void
 }
 
-export default function CommentThread({ comment, onVote, onReply, level = 0 }: CommentThreadProps) {
+export default function CommentThread({
+                                        comment,
+                                        onVote,
+                                        onReply,
+                                        level = 0,
+                                        error,
+                                        onDismissError,
+                                      }: CommentThreadProps) {
   const [isReplying, setIsReplying] = useState(false)
   const [replyContent, setReplyContent] = useState("")
-  const { user } = useAuth()
+  const {user} = useAuth()
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -45,13 +54,12 @@ export default function CommentThread({ comment, onVote, onReply, level = 0 }: C
     setIsReplying(false)
   }
 
-  // recuo: base + por nível
-  const BASE_INDENT = 12 // px
-  const INDENT_PER_LEVEL = 40 // px
+  const BASE_INDENT = 12
+  const INDENT_PER_LEVEL = 40
   const marginLeft = BASE_INDENT + (level ?? 0) * INDENT_PER_LEVEL
 
   return (
-    <div style={{ marginLeft: `${marginLeft}px` }} className="relative">
+    <div style={{marginLeft: `${marginLeft}px`}} className="relative">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex gap-3">
           <div className="flex flex-col items-center space-y-1 min-w-[40px]">
@@ -61,7 +69,7 @@ export default function CommentThread({ comment, onVote, onReply, level = 0 }: C
               aria-label="Votar positivo"
             >
               <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7"/>
               </svg>
             </button>
 
@@ -73,7 +81,7 @@ export default function CommentThread({ comment, onVote, onReply, level = 0 }: C
               aria-label="Votar negativo"
             >
               <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
               </svg>
             </button>
           </div>
@@ -97,6 +105,23 @@ export default function CommentThread({ comment, onVote, onReply, level = 0 }: C
             )}
           </div>
         </div>
+
+        {error && (
+          <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="flex items-center justify-between gap-2">
+              <span>{error}</span>
+              {onDismissError && (
+                <button
+                  type="button"
+                  onClick={onDismissError}
+                  className="text-xs font-medium underline"
+                >
+                  Fechar
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {isReplying && (
@@ -134,7 +159,13 @@ export default function CommentThread({ comment, onVote, onReply, level = 0 }: C
       {comment.replies && comment.replies.length > 0 && (
         <div className="mt-4 space-y-4">
           {comment.replies.map((reply) => (
-            <CommentThread key={reply.id} comment={reply} onVote={onVote} onReply={onReply} level={level + 1} />
+            <CommentThread
+              key={reply.id}
+              comment={reply}
+              onVote={onVote}
+              onReply={onReply}
+              level={level + 1}
+            />
           ))}
         </div>
       )}

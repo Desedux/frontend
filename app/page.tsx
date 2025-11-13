@@ -101,8 +101,8 @@ export default function HomePage() {
   const filteredPosts = useMemo(() => {
     const base = [...posts]
     switch (activeFilter) {
-      case "answered":
-        return base.filter((post) => post.officialResponse)
+      // case "answered":
+      //   return base.filter((post) => post.officialResponse)
       case "recent":
         return base.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       default:
@@ -142,16 +142,16 @@ export default function HomePage() {
             >
               Mais Recentes
             </button>
-            <button
-              onClick={() => setActiveFilter("answered")}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                activeFilter === "answered"
-                  ? "bg-wine text-white"
-                  : "bg-white text-textDark hover:bg-gray-50 border border-gray-200"
-              }`}
-            >
-              Respondidas por Wyden
-            </button>
+            {/*<button*/}
+            {/*  onClick={() => setActiveFilter("answered")}*/}
+            {/*  className={`px-4 py-2 rounded-lg transition-colors ${*/}
+            {/*    activeFilter === "answered"*/}
+            {/*      ? "bg-wine text-white"*/}
+            {/*      : "bg-white text-textDark hover:bg-gray-50 border border-gray-200"*/}
+            {/*  }`}*/}
+            {/*>*/}
+            {/*  Respondidas por Wyden*/}
+            {/*</button>*/}
           </div>
 
           {/* Results count */}

@@ -1,12 +1,12 @@
 import { http } from './http';
-import type { CardModel, CreateCardDto, VoteDto } from './types';
+import {CardModel, CreateCardDto, TagResponseDto, VoteDto} from './types';
 
 export async function getCards(page: number): Promise<CardModel[]> {
-  return http<CardModel[]>(`/card/${page}`);
+  return http<CardModel[]>(`/card?page=${page}`);
 }
 
 export async function getCardsByCategory(tagId: number, page: number): Promise<CardModel[]> {
-  return http<CardModel[]>(`/card/tag/${tagId}/${page}`);
+  return http<CardModel[]>(`/card/tag/${tagId}?page=${page}`);
 }
 
 export async function getCardById(id: string): Promise<CardModel> {
@@ -26,4 +26,8 @@ export async function voteCard(id: string, vote: boolean): Promise<void> {
 
 export async function deleteCard(id: string): Promise<any> {
   return http<any>(`/card/${id}`, { method: 'DELETE' });
+}
+
+export async function getTags(): Promise<TagResponseDto[]> {
+  return http<TagResponseDto[]>("/tags", { method: "GET" })
 }
