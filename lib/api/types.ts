@@ -31,22 +31,19 @@ export type CreateCardDto = {
 
 export type VoteDto = { isUpvote: boolean };
 
-export type CommentResponseDto = {
-  id: number;
-  card_id: number;
-  parent_id: number | null;
-  content: string;
-  author: string;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-
-  likesCount?: number;
-  dislikesCount?: number;
-  myReaction?: 'like'|'dislike'|null;
-  up_down?: number;
-  replies?: CommentResponseDto[];
-};
+export interface CommentResponseDto {
+  id: number | string
+  card_id: number
+  user_uid: string
+  author: string
+  content: string
+  up_down: number
+  parent_id: number | null
+  deactivate?: boolean
+  created_at: string
+  updated_at: string
+  user_vote?: number
+}
 
 export type PaginatedCommentsResponse = {
   data: CommentResponseDto[];

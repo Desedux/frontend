@@ -22,8 +22,21 @@ export interface Comment {
   votes: number
   isOfficial: boolean
   replies: Comment[]
+  deactivate?: boolean
+  userUid?: string
+  user_uid?: string
+  userVote: number
 }
 
+interface CommentThreadProps {
+  comment: Comment
+  onVote: (commentId: number, voteType: boolean) => void | Promise<void>
+  onReply: (parentId: number, replyContent: string) => void | Promise<void>
+  onDelete?: (commentId: number) => void | Promise<void>
+  level?: number
+  error?: string
+  onDismissError?: () => void
+}
 export interface User {
   id: number
   email: string

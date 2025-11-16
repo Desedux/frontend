@@ -5,20 +5,47 @@ import { useEffect, useState } from "react"
 import CreatePostModal from "./CreatePostModal"
 import UserLogin from "./UserLogin"
 import { useAuth } from "@/contexts/AuthContext"
+import { createCard } from "@/lib/api/cards"
+import { getTags } from "@/lib/api/tags"
 
-export default function Header() {
+type HeaderProps = {
+  onPostCreated?: (card: any) => void
+}
+
+export default function Header({ onPostCreated }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const { user, login, logout, isLoading } = useAuth()
 
-  const handleCreatePost = (postData: {
+  const handleCreatePost = async (postData: {
     title: string
     content: string
     category: string
     isAnonymous: boolean
   }) => {
-    console.log("Nova pergunta criada:", postData)
+    let tags: { id: number; name: string }[] = []
+
+    try {
+      tags = await getTags()
+    } catch {
+      tags = []
+    }
+
+    const found = tags.find(t => t.name === postData.category)
+    const fallbackId = tags[0]?.id ?? 1
+    const tagId = found?.id ?? fallbackId
+
+    const created = await createCard({
+      title: postData.title,
+      description: postData.content,
+      isAnonymous: postData.isAnonymous,
+      tags: [tagId],
+    })
+
+    if (onPostCreated) {
+      onPostCreated(created)
+    }
   }
 
   useEffect(() => {

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import type {Post} from "@/lib/types"
+import type { Post } from "@/lib/types"
 
 type PostCardProps = {
   post: Post
@@ -9,6 +9,17 @@ type PostCardProps = {
   error?: string
   voting?: boolean
   onDismissError?: () => void
+}
+
+function formatDate(dateString: string) {
+  const date = new Date(dateString)
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }
 
 export default function PostCard({ post, onVote, error, voting }: PostCardProps) {
@@ -78,7 +89,10 @@ export default function PostCard({ post, onVote, error, voting }: PostCardProps)
 
           <div className="flex flex-wrap gap-2 mb-4">
             {post.tags.map((tag) => (
-              <span key={tag} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
+              <span
+                key={tag}
+                className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm"
+              >
                 {tag}
               </span>
             ))}
@@ -89,6 +103,20 @@ export default function PostCard({ post, onVote, error, voting }: PostCardProps)
               {error}
             </div>
           )}
+
+          <div className="flex items-center justify-between text-xs text-gray-500 mt-4 pt-3 border-t border-gray-100">
+            <div className="flex items-center gap-3">
+              <span>Por: {post.isAnonymous ? "Anônimo" : post.author}</span>
+              <span>•</span>
+              <span>{formatDate(post.createdAt)}</span>
+            </div>
+
+            {post.category && (
+              <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-700">
+                {post.category}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

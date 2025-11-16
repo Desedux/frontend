@@ -29,14 +29,12 @@ export default function HomePage() {
         const cards = await getCards(page)
         const mapped = cards.map((c) => mapCardToPostVM(c))
 
-        // merge sem duplicar
         setPosts((prev) => {
           const byId = new Map<number, Post>()
           ;[...prev, ...mapped].forEach((p) => byId.set(p.id, p))
           return Array.from(byId.values())
         })
 
-        // se retornou menos que 20, não há mais páginas
         setHasMore(cards.length >= 20)
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "Erro ao carregar posts")
@@ -121,12 +119,18 @@ export default function HomePage() {
     }
   }
 
+  function handlePostCreated(card: any) {
+    const mapped = mapCardToPostVM(card)
+
+    setPosts(prev => {
+      if (prev.some(p => p.id === mapped.id)) return prev
+      return [mapped, ...prev]
+    })
+  }
 
   const filteredPosts = useMemo(() => {
     const base = [...posts]
     switch (activeFilter) {
-      // case "answered":
-      //   return base.filter((post) => post.officialResponse)
       case "recent":
         return base.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       default:
@@ -136,7 +140,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-bgLight">
-      <Header/>
+      <Header onPostCreated={handlePostCreated} />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-8">
@@ -166,19 +170,8 @@ export default function HomePage() {
             >
               Mais Recentes
             </button>
-            {/*<button*/}
-            {/*  onClick={() => setActiveFilter("answered")}*/}
-            {/*  className={`px-4 py-2 rounded-lg transition-colors ${*/}
-            {/*    activeFilter === "answered"*/}
-            {/*      ? "bg-wine text-white"*/}
-            {/*      : "bg-white text-textDark hover:bg-gray-50 border border-gray-200"*/}
-            {/*  }`}*/}
-            {/*>*/}
-            {/*  Respondidas por Wyden*/}
-            {/*</button>*/}
           </div>
 
-          {/* Results count */}
           <p className="text-sm text-gray-600">
             {filteredPosts.length} pergunta{filteredPosts.length !== 1 ? "s" : ""} encontrada
             {filteredPosts.length !== 1 ? "s" : ""}
@@ -238,7 +231,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Load more */}
         <div className="flex justify-center py-10">
           <button
             disabled={loading || !hasMore}

@@ -1,9 +1,8 @@
 "use client"
 
 import type React from "react"
-import {createCard} from "@/lib/api/cards"
-import { useState } from "react"
-import {getTags} from "@/lib/api/tags";
+import { useEffect, useState } from "react"
+import { getTags } from "@/lib/api/tags"
 
 interface CreatePostModalProps {
   isOpen: boolean
@@ -16,52 +15,42 @@ interface CreatePostModalProps {
   }) => Promise<void>
 }
 
-const handleCreatePost = async (postData: {
-  title: string
-  content: string
-  category: string
-  isAnonymous: boolean
-}) => {
-  let tags: { id: number; name: string }[] = []
-
-  try {
-    tags = await getTags()
-  } catch {
-    tags = []
-  }
-
-  const found = tags.find(t => t.name === postData.category)
-  const fallbackId = tags[0]?.id ?? 1
-  const tagId = found?.id ?? fallbackId
-
-  await createCard({
-    title: postData.title,
-    description: postData.content,
-    isAnonymous: postData.isAnonymous,
-    tags: [tagId],
-  })
+interface TagOption {
+  id: number
+  name: string
 }
-
-
 
 export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalProps) {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [category, setCategory] = useState("")
   const [isAnonymous, setIsAnonymous] = useState(false)
+  const [categories, setCategories] = useState<TagOption[]>([])
 
-  const categories = [
-    "Segurança",
-    "Educação",
-    "Saúde",
-    "Transporte",
-    "Meio Ambiente",
-    "Economia",
-    "Infraestrutura",
-    "Cultura",
-    "Esporte",
-    "Outros",
-  ]
+  useEffect(() => {
+    if (!isOpen) return
+
+    let cancelled = false
+
+    const loadCategories = async () => {
+      try {
+        const tags = await getTags()
+        if (!cancelled) {
+          setCategories(tags.map((t: any) => ({ id: t.id, name: t.name })))
+        }
+      } catch {
+        if (!cancelled) {
+          setCategories([])
+        }
+      }
+    }
+
+    void loadCategories()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -81,7 +70,6 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
     onClose()
   }
 
-
   const handleClose = () => {
     setTitle("")
     setContent("")
@@ -95,7 +83,6 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-textDark">Nova Pergunta</h2>
           <button
@@ -109,9 +96,7 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Title */}
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-textDark mb-2">
               Título da Pergunta *
@@ -129,7 +114,6 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
             <p className="text-xs text-gray-500 mt-1">{title.length}/200 caracteres</p>
           </div>
 
-          {/* Category */}
           <div>
             <label htmlFor="category" className="block text-sm font-medium text-textDark mb-2">
               Categoria *
@@ -143,14 +127,13 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
             >
               <option value="">Selecione uma categoria</option>
               {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
+                <option key={cat.id} value={cat.name}>
+                  {cat.name}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Content */}
           <div>
             <label htmlFor="content" className="block text-sm font-medium text-textDark mb-2">
               Descrição *
@@ -168,7 +151,6 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
             <p className="text-xs text-gray-500 mt-1">{content.length}/2000 caracteres</p>
           </div>
 
-          {/* Anonymous Option */}
           <div className="flex items-center">
             <input
               type="checkbox"
@@ -182,7 +164,6 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
             </label>
           </div>
 
-          {/* Actions */}
           <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200">
             <button
               type="button"
@@ -191,7 +172,11 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
             >
               Cancelar
             </button>
-            <button type="submit" className="btn-primary" disabled={!title.trim() || !content.trim() || !category}>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={!title.trim() || !content.trim() || !category}
+            >
               Publicar Pergunta
             </button>
           </div>

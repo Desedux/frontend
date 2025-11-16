@@ -8,7 +8,7 @@ import CommentThread from "@/components/CommentThread"
 import OfficialResponseComment from "@/components/OfficialResponseComment"
 import type {Post, Comment} from "@/lib/types"
 import {getCardById, voteCard} from "@/lib/api/cards"
-import {listComments, createComment, setReaction} from "@/lib/api/commentary"
+import {listComments, createComment, setReaction, deleteComment} from "@/lib/api/commentary"
 import type {CommentResponseDto} from "@/lib/api/types"
 import {openLoginModal} from "@/lib/ui";
 
@@ -25,12 +25,16 @@ function mapComment(dto: CommentResponseDto): Comment {
     content: dto.content,
     author: dto.author,
     isAnonymous: false,
-    createdAt: (dto as any).created_at,
+    createdAt: dto.created_at,
     votes,
-    isOfficial: Boolean((dto as any).is_official ?? (dto as any).isOfficial ?? false),
+    isOfficial: false,
     replies: [],
+    deactivate: Boolean((dto as any).deactivate),
+    user_uid: (dto as any).user_uid ?? undefined,
+    userVote: (dto as any).user_vote ?? 0,
   }
 }
+
 
 export default function PostDetailPage() {
   const params = useParams()
@@ -175,22 +179,49 @@ export default function PostDetailPage() {
   function updateCommentVotesTree(
     items: Comment[],
     commentId: number,
-    delta: number,
+    voteType: boolean,
   ): Comment[] {
     return items.map((c) => {
       if (c.id === commentId) {
-        return { ...c, votes: c.votes + delta }
+        const currentUserVote = c.userVote ?? 0
+        let newUserVote: number
+
+        if (voteType) {
+          if (currentUserVote === 1) newUserVote = 0
+          else if (currentUserVote === 0) newUserVote = 1
+          else newUserVote = 0
+        } else {
+          if (currentUserVote === -1) newUserVote = 0
+          else if (currentUserVote === 0) newUserVote = -1
+          else newUserVote = 0
+        }
+
+        const delta = newUserVote - currentUserVote
+
+        return {
+          ...c,
+          votes: c.votes + delta,
+          userVote: newUserVote,
+        }
       }
+
       if (c.replies && c.replies.length) {
-        return { ...c, replies: updateCommentVotesTree(c.replies, commentId, delta) }
+        return {
+          ...c,
+          replies: updateCommentVotesTree(c.replies, commentId, voteType),
+        }
       }
+
       return c
     })
   }
 
+
   const handleCommentVote = async (commentId: number, voteType: boolean) => {
+    const previousComments = comments
+
     setComments(prevList =>
-      updateCommentVotesTree(prevList, commentId, voteType ? 1 : -1),
+      updateCommentVotesTree(prevList, commentId, voteType),
     )
 
     try {
@@ -210,11 +241,7 @@ export default function PostDetailPage() {
       }
 
       setCommentVoteErrors(prev => ({ ...prev, [commentId]: message }))
-
-      setComments(prevList =>
-        updateCommentVotesTree(prevList, commentId, voteType ? -1 : 1),
-      )
-
+      setComments(previousComments)
       setTimeout(() => clearCommentVoteError(commentId), 3000)
     }
   }
@@ -235,6 +262,15 @@ export default function PostDetailPage() {
       setComments((prev) => insertReply(prev, parentId, reply))
       setPost((p) => (p ? {...p, commentCount: p.commentCount + 1} : p))
     } catch {}
+  }
+
+  const handleDeleteComment = async (commentId: number) => {
+    try {
+      await deleteComment(postId, commentId)
+      await loadComments()
+    } catch (err) {
+      console.error("Erro ao deletar comentário", err)
+    }
   }
 
   const handleSubmitComment = async (e: React.FormEvent) => {
@@ -392,6 +428,7 @@ export default function PostDetailPage() {
               comment={comment}
               onVote={(id, dir) => handleCommentVote(id, dir)}
               onReply={handleReply}
+              onDelete={handleDeleteComment}
               error={commentVoteErrors[comment.id]}
               onDismissError={() => clearCommentVoteError(comment.id)}
             />
