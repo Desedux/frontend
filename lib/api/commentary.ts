@@ -16,6 +16,7 @@ export async function listComments(
 }
 
 export async function createComment(cardId: number, dto: CreateCommentDto) {
+  console.log('Creating comment', cardId, dto)
   return http<CommentResponseDto>(`/commentary/${cardId}`, { method: 'POST', body: dto });
 }
 

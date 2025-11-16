@@ -28,7 +28,7 @@ function mapComment(dto: CommentResponseDto): Comment {
     createdAt: (dto as any).created_at,
     votes,
     isOfficial: Boolean((dto as any).is_official ?? (dto as any).isOfficial ?? false),
-    replies: [], // árvore montada depois
+    replies: [],
   }
 }
 
@@ -61,6 +61,7 @@ export default function PostDetailPage() {
           isAnonymous: false,
           createdAt: card.created_at,
           votes: card.up_down,
+          userVote: (card as any).user_vote ?? 0,
           commentCount: 0,
           tags: [],
           category: "",
@@ -94,7 +95,6 @@ export default function PostDetailPage() {
         else roots.push(node)
       }
     })
-
 
     const sortByDate = (a: Comment, b: Comment) =>
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -139,17 +139,37 @@ export default function PostDetailPage() {
     return () => { cancelledRef.current = true }
   }, [postId])
 
-  // Like do CARD mantido
   const handleVote = async (postIdNum: number, voteType: "up" | "down") => {
     if (!post) return
-    setPost((prev) =>
-      prev ? { ...prev, votes: voteType === "up" ? prev.votes + 1 : prev.votes - 1 } : null,
-    )
-    voteCard(String(postIdNum), voteType === "up").catch(() => {
-      setPost((prev) =>
-        prev ? { ...prev, votes: voteType === "up" ? prev.votes - 1 : prev.votes + 1 } : null,
-      )
+
+    const isLike = voteType === "up"
+    const previousPost = post
+    const currentUserVote = previousPost.userVote ?? 0
+
+    let newUserVote: number
+    if (isLike) {
+      if (currentUserVote === 1) newUserVote = 0
+      else if (currentUserVote === 0) newUserVote = 1
+      else newUserVote = 0
+    } else {
+      if (currentUserVote === -1) newUserVote = 0
+      else if (currentUserVote === 0) newUserVote = -1
+      else newUserVote = 0
+    }
+
+    const delta = newUserVote - currentUserVote
+
+    setPost({
+      ...previousPost,
+      votes: previousPost.votes + delta,
+      userVote: newUserVote,
     })
+
+    try {
+      await voteCard(String(postIdNum), isLike)
+    } catch {
+      setPost(previousPost)
+    }
   }
 
   function updateCommentVotesTree(
@@ -197,9 +217,7 @@ export default function PostDetailPage() {
 
       setTimeout(() => clearCommentVoteError(commentId), 3000)
     }
-
   }
-
 
   function insertReply(items: Comment[], parentId: number, reply: Comment): Comment[] {
     return items.map((c) => {
@@ -282,7 +300,6 @@ export default function PostDetailPage() {
     )
   }
 
-
   return (
     <div className="min-h-screen bg-bgLight">
       <Header/>
@@ -299,7 +316,12 @@ export default function PostDetailPage() {
                 className="p-2 rounded-full hover:bg-gray-100 transition-colors"
                 aria-label="Votar positivo"
               >
-                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className={`w-6 h-6 ${post.userVote === 1 ? "text-green-600" : "text-gray-600"}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7"/>
                 </svg>
               </button>
@@ -309,7 +331,12 @@ export default function PostDetailPage() {
                 className="p-2 rounded-full hover:bg-gray-100 transition-colors"
                 aria-label="Votar negativo"
               >
-                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className={`w-6 h-6 ${post.userVote === -1 ? "text-red-600" : "text-gray-600"}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
                 </svg>
               </button>

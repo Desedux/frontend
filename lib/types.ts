@@ -10,6 +10,7 @@ export interface Post {
   tags: string[]
   category: string
   officialResponse: boolean
+  userVote: number
 }
 
 export interface Comment {

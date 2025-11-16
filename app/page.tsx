@@ -62,32 +62,55 @@ export default function HomePage() {
     if (votingIds.has(postId)) return
     const isUpvote = voteType === "up"
 
+    const prevPosts = posts
+
     setVotingIds(prev => new Set(prev).add(postId))
 
     setPosts(prev =>
-      prev.map(p => (p.id === postId ? {...p, votes: isUpvote ? p.votes + 1 : p.votes - 1} : p)),
+      prev.map(p => {
+        if (p.id !== postId) return p
+
+        const currentUserVote = p.userVote ?? 0
+        let newUserVote: number
+
+        if (isUpvote) {
+          if (currentUserVote === 1) newUserVote = 0
+          else if (currentUserVote === 0) newUserVote = 1
+          else newUserVote = 0
+        } else {
+          if (currentUserVote === -1) newUserVote = 0
+          else if (currentUserVote === 0) newUserVote = -1
+          else newUserVote = 0
+        }
+
+        const delta = newUserVote - currentUserVote
+
+        return {
+          ...p,
+          votes: p.votes + delta,
+          userVote: newUserVote,
+        }
+      }),
     )
 
     try {
       await voteCard(String(postId), isUpvote)
       clearVoteError(postId)
     } catch (err: any) {
-      console.error('Não foi possível registrar o voto:', err)
+      console.error("Não foi possível registrar o voto:", err)
+      const msg = err?.message || ""
       let message: string
-      const msg = err.message || ""
+
       if (msg.includes("Vote already recorded")) {
-        message = `Você já deu ${voteType == 'up' ? "like" : "dislike"} nesse card.`
-      }else if (msg.includes("Forbidden resource")){
+        message = `Você já deu ${voteType === "up" ? "like" : "dislike"} nesse card.`
+      } else if (msg.includes("Forbidden resource") || msg.includes("Unauthorized")) {
         message = "Você precisa estar logado para votar."
       } else {
         message = "Não foi possível registrar seu voto. Tente novamente."
       }
 
-      setVoteErrors(prev => ({...prev, [postId]: message}))
-
-      setPosts(prev =>
-        prev.map(p => (p.id === postId ? {...p, votes: isUpvote ? p.votes - 1 : p.votes + 1} : p)),
-      )
+      setVoteErrors(prev => ({ ...prev, [postId]: message }))
+      setPosts(prevPosts)
       setTimeout(() => clearVoteError(postId), 3000)
     } finally {
       setVotingIds(prev => {
@@ -97,6 +120,7 @@ export default function HomePage() {
       })
     }
   }
+
 
   const filteredPosts = useMemo(() => {
     const base = [...posts]

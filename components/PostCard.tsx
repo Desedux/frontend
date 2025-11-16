@@ -1,20 +1,7 @@
 "use client"
 
 import Link from "next/link"
-
-interface Post {
-  id: number
-  title: string
-  content: string
-  author: string
-  isAnonymous: boolean
-  createdAt: string
-  votes: number
-  commentCount: number
-  tags: string[]
-  category: string
-  officialResponse: boolean
-}
+import type {Post} from "@/lib/types"
 
 type PostCardProps = {
   post: Post
@@ -32,10 +19,19 @@ export default function PostCard({ post, onVote, error, voting }: PostCardProps)
           <button
             onClick={() => onVote(post.id, "up")}
             disabled={!!voting}
-            className={`p-2 rounded-full transition-colors ${voting ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100"}`}
+            className={`p-2 rounded-full transition-colors ${
+              voting ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100"
+            }`}
             aria-label="Votar positivo"
           >
-            <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className={`w-6 h-6 ${
+                post.userVote === 1 ? "text-green-600" : "text-gray-600"
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
             </svg>
           </button>
@@ -45,10 +41,19 @@ export default function PostCard({ post, onVote, error, voting }: PostCardProps)
           <button
             onClick={() => onVote(post.id, "down")}
             disabled={!!voting}
-            className={`p-2 rounded-full transition-colors ${voting ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100"}`}
+            className={`p-2 rounded-full transition-colors ${
+              voting ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100"
+            }`}
             aria-label="Votar negativo"
           >
-            <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className={`w-6 h-6 ${
+                post.userVote === -1 ? "text-red-600" : "text-gray-600"
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
@@ -71,7 +76,6 @@ export default function PostCard({ post, onVote, error, voting }: PostCardProps)
 
           <p className="text-gray-600 mb-4 line-clamp-2">{post.content}</p>
 
-          {/* Tags */}
           <div className="flex flex-wrap gap-2 mb-4">
             {post.tags.map((tag) => (
               <span key={tag} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
@@ -90,4 +94,3 @@ export default function PostCard({ post, onVote, error, voting }: PostCardProps)
     </div>
   )
 }
-

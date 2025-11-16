@@ -1,5 +1,6 @@
 
 import type { CardModel, TagResponseDto } from './api/types';
+import {Post} from "@/lib/types";
 
 export type PostVM = {
   id: number;
@@ -13,6 +14,7 @@ export type PostVM = {
   tags: string[];
   category: string;
   officialResponse: boolean;
+  userVote: number;
 };
 
 export type CategoryVM = {
@@ -24,7 +26,7 @@ export type CategoryVM = {
   color: string;
 };
 
-export function mapCardToPostVM(card: CardModel, tagIndex?: Map<number,string>): PostVM {
+export function mapCardToPostVM(card: any): Post {
   return {
     id: card.id,
     title: card.title,
@@ -32,12 +34,13 @@ export function mapCardToPostVM(card: CardModel, tagIndex?: Map<number,string>):
     author: card.author,
     isAnonymous: false,
     createdAt: card.created_at,
-    votes: card.up_down,
+    votes: card.up_down ?? 0,
+    userVote: card.user_vote ?? 0,
     commentCount: 0,
     tags: [],
-    category: '',
+    category: "",
     officialResponse: false,
-  };
+  }
 }
 
 export function mapTagToCategoryVM(tag: TagResponseDto): CategoryVM {
