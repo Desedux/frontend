@@ -9,6 +9,7 @@ import type {Post} from "@/lib/types"
 import {getTags} from "@/lib/api/tags"
 import {getCardsByCategory, voteCard} from "@/lib/api/cards"
 import {mapCardToPostVM} from "@/lib/mappers"
+import {useAuth} from "@/contexts/AuthContext";
 
 type SortKind = "recent" | "popular"
 

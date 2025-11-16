@@ -26,7 +26,7 @@ export type CategoryVM = {
   color: string;
 };
 
-export function mapCardToPostVM(card: any): Post {
+export function mapCardToPostVM(card: any, tagIndex: Map<number, string>): Post {
   return {
     id: card.id,
     title: card.title,
