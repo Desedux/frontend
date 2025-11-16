@@ -40,6 +40,7 @@ export function mapCardToPostVM(card: any): Post {
     tags: [],
     category: "",
     officialResponse: false,
+    userUid: card.user_id
   }
 }
 

@@ -4,13 +4,14 @@ import {useEffect, useMemo, useState} from "react"
 import Header from "@/components/Header"
 import PostCard from "@/components/PostCard"
 import type {Post} from "@/lib/types"
-import {getCards, voteCard} from "@/lib/api/cards"
+import {getCards, voteCard, deleteCard} from "@/lib/api/cards"
 import {mapCardToPostVM} from "@/lib/mappers"
+import {useAuth} from "@/contexts/AuthContext";
 
-type FilterType = "relevant" | "recent" | "answered"
+type FilterType = "relevant" | "recent" | "answered" | "my answered"
 
 export default function HomePage() {
-  const [activeFilter, setActiveFilter] = useState<FilterType>("relevant")
+  const [activeFilter, setActiveFilter] = useState<FilterType>("recent")
   const [posts, setPosts] = useState<Post[]>([])
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -18,6 +19,11 @@ export default function HomePage() {
   const [hasMore, setHasMore] = useState(true)
   const [votingIds, setVotingIds] = useState<Set<number>>(new Set())
   const [voteErrors, setVoteErrors] = useState<Record<number, string>>({})
+
+  // estado de deleção
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -128,11 +134,79 @@ export default function HomePage() {
     })
   }
 
+  // abrir modal de deleção
+  function handleAskDelete(postId: number) {
+    setDeleteTargetId(postId)
+    setDeleteError(null)
+  }
+
+  function handleCancelDelete() {
+    if (isDeleting) return
+    setDeleteTargetId(null)
+    setDeleteError(null)
+  }
+
+  async function handleConfirmDelete() {
+    if (deleteTargetId == null) return
+
+    const postId = deleteTargetId
+    const previousPosts = posts
+
+    setIsDeleting(true)
+    setDeleteError(null)
+
+    // otimista: remove da lista
+    setPosts(prev => prev.filter(p => p.id !== postId))
+
+    try {
+      await deleteCard(String(postId))
+      setDeleteTargetId(null)
+    } catch (err: any) {
+      console.error("Erro ao deletar card:", err)
+      const msg = err?.message || ""
+
+      let message: string
+      if (msg.includes("Forbidden")) {
+        message = "Você só pode excluir cards que você criou."
+      } else if (msg.includes("Unauthorized")) {
+        message = "Você precisa estar logado para excluir um card."
+      } else if (msg.includes('Card not found')) {
+        message = "Este card já foi excluído."
+      } else {
+        message = "Não foi possível excluir este card. Tente novamente."
+      }
+
+      setDeleteError(message)
+      // rollback
+      setPosts(previousPosts)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const { user } = useAuth()
+
+  function extractUidFromToken(token?: string): string | null {
+    if (!token || typeof window === "undefined") return null
+
+    try {
+      const [, payload] = token.split(".")
+      const normalized = payload.replace(/-/g, "+").replace(/_/g, "/")
+      const decoded = JSON.parse(atob(normalized))
+      return decoded.user_id ?? null
+    } catch {
+      return null
+    }
+  }
+  const currentUserUid = extractUidFromToken(user?.tokens.idToken)
+
   const filteredPosts = useMemo(() => {
     const base = [...posts]
     switch (activeFilter) {
       case "recent":
         return base.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      case "my answered":
+        return base.filter(post => post.userUid == currentUserUid)
       default:
         return base.sort((a, b) => b.votes - a.votes)
     }
@@ -170,6 +244,16 @@ export default function HomePage() {
             >
               Mais Recentes
             </button>
+            <button
+              onClick={() => setActiveFilter("my answered")}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                activeFilter === "my answered"
+                  ? "bg-wine text-white"
+                  : "bg-white text-textDark hover:bg-gray-50 border border-gray-200"
+              }`}
+            >
+              Meus Cards
+            </button>
           </div>
 
           <p className="text-sm text-gray-600">
@@ -205,6 +289,8 @@ export default function HomePage() {
               error={voteErrors[post.id]}
               voting={votingIds.has(post.id)}
               onDismissError={() => clearVoteError(post.id)}
+              onDelete={() => handleAskDelete(post.id)}
+              userUid={currentUserUid}
             />
           ))}
         </div>
@@ -245,6 +331,44 @@ export default function HomePage() {
           </button>
         </div>
       </main>
+
+      {deleteTargetId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg border border-gray-200 max-w-sm w-full mx-4 p-6">
+            <h4 className="text-lg font-semibold text-textDark mb-2">
+              Excluir pergunta?
+            </h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Tem certeza que deseja excluir este card? Essa ação não pode ser desfeita.
+            </p>
+
+            {deleteError && (
+              <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCancelDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60"
+              >
+                {isDeleting ? "Excluindo..." : "Excluir"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

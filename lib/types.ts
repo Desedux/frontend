@@ -11,6 +11,7 @@ export interface Post {
   category: string
   officialResponse: boolean
   userVote: number
+  userUid?: string
 }
 
 export interface Comment {

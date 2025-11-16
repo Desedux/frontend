@@ -2,13 +2,16 @@
 
 import Link from "next/link"
 import type { Post } from "@/lib/types"
+import {useAuth} from "@/contexts/AuthContext";
 
 type PostCardProps = {
   post: Post
-  onVote: (postId: number, voteType: "up" | "down") => void
+  userUid?: string | null
+  onVote: (id: number, dir: "up" | "down") => void
+  voting: boolean
   error?: string
-  voting?: boolean
   onDismissError?: () => void
+  onDelete?: () => void
 }
 
 function formatDate(dateString: string) {
@@ -22,7 +25,9 @@ function formatDate(dateString: string) {
   })
 }
 
-export default function PostCard({ post, onVote, error, voting }: PostCardProps) {
+
+export default function PostCard({ post, onVote, error, voting, onDelete, userUid }: PostCardProps) {
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex gap-4">
@@ -111,11 +116,23 @@ export default function PostCard({ post, onVote, error, voting }: PostCardProps)
               <span>{formatDate(post.createdAt)}</span>
             </div>
 
-            {post.category && (
-              <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-700">
-                {post.category}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {userUid == post.userUid && onDelete && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="text-xs text-gray-500 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-full transition-colors"
+                >
+                  Excluir
+                </button>
+              )}
+
+              {post.category && (
+                <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-700">
+                  {post.category}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>

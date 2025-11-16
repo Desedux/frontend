@@ -1,6 +1,7 @@
 "use client"
 
 import {createContext, useContext, useEffect, useState, type ReactNode} from "react"
+import {http} from "@/lib/api/http"  // <-- usa o helper
 
 interface Tokens {
   idToken: string
@@ -22,8 +23,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"
 const STORAGE_KEY = "desedux_user"
+
+type LoginResponse = {
+  idToken: string
+  refreshToken: string
+  expiresIn: string
+  email?: string
+}
 
 export function AuthProvider({children}: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -31,25 +38,10 @@ export function AuthProvider({children}: { children: ReactNode }) {
 
   async function callRefresh(refreshToken: string, emailFallback?: string): Promise<User | null> {
     try {
-      const res = await fetch(`${API_BASE}/auth/refresh`, {
+      const data = await http<LoginResponse>("/auth/refresh", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({refreshToken}),
+        body: {refreshToken},
       })
-
-
-      if (!res.ok) {
-
-        return null
-      }
-
-      const data: {
-        idToken: string
-        refreshToken: string
-        expiresIn: string
-        email?: string
-      } = await res.json()
-
 
       const expiresAt = Date.now() + Number(data.expiresIn) * 1000
 
@@ -61,91 +53,54 @@ export function AuthProvider({children}: { children: ReactNode }) {
           expiresAt,
         },
       }
-    } catch (err) {
-
+    } catch {
       return null
     }
   }
 
-  // 1) INIT: lê do localStorage UMA vez
   useEffect(() => {
-
-
     if (typeof window === "undefined") return
 
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
-
-
       if (!stored) {
-
         setUser(null)
         return
       }
 
       const parsed = JSON.parse(stored) as User
 
-
       if (!parsed?.tokens?.refreshToken || !parsed?.tokens?.expiresAt) {
-
         localStorage.removeItem(STORAGE_KEY)
         setUser(null)
         return
       }
 
       setUser(parsed)
-    } catch (err) {
-
+    } catch {
       localStorage.removeItem(STORAGE_KEY)
       setUser(null)
     } finally {
-
       setIsLoading(false)
     }
   }, [])
 
-  // 2) SYNC user -> localStorage (só DEPOIS do init terminar)
   useEffect(() => {
-
-
     if (typeof window === "undefined") return
-
-    // enquanto está carregando do storage, NÃO mexe em nada
-    if (isLoading) {
-
-      return
-    }
+    if (isLoading) return
 
     if (user) {
-
       localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
     } else {
-
       localStorage.removeItem(STORAGE_KEY)
     }
   }, [user, isLoading])
 
   async function login(credentials: { email: string; password: string }) {
-
-
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    const data = await http<LoginResponse>("/auth/login", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(credentials),
+      body: credentials,
     })
-
-
-    if (!res.ok) {
-      throw new Error("Credenciais inválidas")
-    }
-
-    const data: {
-      idToken: string
-      refreshToken: string
-      expiresIn: string
-      email?: string
-    } = await res.json()
-
 
     const expiresAt = Date.now() + Number(data.expiresIn) * 1000
 
@@ -158,38 +113,22 @@ export function AuthProvider({children}: { children: ReactNode }) {
       },
     }
 
-
     setUser(newUser)
   }
 
-  // 3) REFRESH automático
   useEffect(() => {
-
-
-    if (!user?.tokens) {
-
-      return
-    }
+    if (!user?.tokens) return
 
     const now = Date.now()
     const msToExpiry = user.tokens.expiresAt - now
 
-
     const doRefresh = async () => {
-
       const refreshed = await callRefresh(user.tokens.refreshToken, user.email)
-
-      if (!refreshed) {
-
-        setUser(null)
-      } else {
-
-        setUser(refreshed)
-      }
+      if (!refreshed) setUser(null)
+      else setUser(refreshed)
     }
 
     if (msToExpiry <= 0) {
-
       void doRefresh()
       return
     }
@@ -197,23 +136,16 @@ export function AuthProvider({children}: { children: ReactNode }) {
     const offset = 5 * 60 * 1000
     const timeoutMs = Math.max(msToExpiry - offset, 30 * 1000)
 
-
     const id = setTimeout(() => {
-
       void doRefresh()
     }, timeoutMs)
 
-    return () => {
-
-      clearTimeout(id)
-    }
+    return () => clearTimeout(id)
   }, [user])
 
   function logout() {
-
     setUser(null)
   }
-
 
   return (
     <AuthContext.Provider value={{user, login, logout, isLoading}}>
@@ -224,9 +156,8 @@ export function AuthProvider({children}: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext)
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useAuth must be used within an AuthProvider")
   }
-
   return context
 }

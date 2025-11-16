@@ -21,6 +21,21 @@ type CategoryView = {
 }
 
 export default function CategoryPage() {
+  const { user } = useAuth()
+
+  function extractUidFromToken(token?: string): string | null {
+    if (!token || typeof window === "undefined") return null
+
+    try {
+      const [, payload] = token.split(".")
+      const normalized = payload.replace(/-/g, "+").replace(/_/g, "/")
+      const decoded = JSON.parse(atob(normalized))
+      return decoded.user_id ?? null
+    } catch {
+      return null
+    }
+  }
+  const currentUserUid = extractUidFromToken(user?.tokens.idToken)
   const params = useParams()
   const categoryId = Number(params.id)
   const [votingIds, setVotingIds] = useState<Set<number>>(new Set())
@@ -267,6 +282,7 @@ export default function CategoryPage() {
               error={voteErrors[post.id]}
               voting={votingIds.has(post.id)}
               onDismissError={() => clearVoteError(post.id)}
+              userUid={currentUserUid}
             />)
           ) : (
             <div className="text-center py-12 bg-white rounded-lg shadow-sm border border-gray-200">

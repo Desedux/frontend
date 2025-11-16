@@ -60,6 +60,7 @@ export default function UserLogin({ isOpen, onClose, onLogin }: UserLoginProps) 
     setError("")
     setSuccess("")
     try {
+      console.log('Apelando API de login em', `${API_BASE}/auth/login`)
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
