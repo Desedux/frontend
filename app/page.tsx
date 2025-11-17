@@ -225,16 +225,6 @@ export default function HomePage() {
         <div className="mb-8">
           <div className="flex flex-wrap gap-4 mb-6">
             <button
-              onClick={() => setActiveFilter("relevant")}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                activeFilter === "relevant"
-                  ? "bg-wine text-white"
-                  : "bg-white text-textDark hover:bg-gray-50 border border-gray-200"
-              }`}
-            >
-              Mais Relevantes
-            </button>
-            <button
               onClick={() => setActiveFilter("recent")}
               className={`px-4 py-2 rounded-lg transition-colors ${
                 activeFilter === "recent"
@@ -243,6 +233,16 @@ export default function HomePage() {
               }`}
             >
               Mais Recentes
+            </button>
+            <button
+              onClick={() => setActiveFilter("relevant")}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                activeFilter === "relevant"
+                  ? "bg-wine text-white"
+                  : "bg-white text-textDark hover:bg-gray-50 border border-gray-200"
+              }`}
+            >
+              Mais Relevantes
             </button>
             <button
               onClick={() => setActiveFilter("my answered")}
