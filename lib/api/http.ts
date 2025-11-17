@@ -1,7 +1,9 @@
-export const API_BASE =
-  typeof window === "undefined"
-    ? (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001")
-    : "/api"
+const isServer = typeof window === 'undefined'
+
+ export const API_BASE = isServer
+  ? process.env.API_INTERNAL_BASE_URL ?? '/api'
+  : process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api'
+
 
 function getToken() {
   if (typeof window === "undefined") return null
